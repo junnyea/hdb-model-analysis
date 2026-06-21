@@ -2,16 +2,11 @@
 # L06 — Better, Trustworthy HDB Price Model
 # Training logic (shared by the Streamlit app and command line).
 #
-# What changed from L01-L05:
-#   1. We add MORE features (flat_type, town) on top of the original 3.
-#   2. We MEASURE how good the model is using MAE (average dollar error).
-#   3. We COMPARE two models and keep the better one.
+# The feature list lives in features.py — change it there once and BOTH
+# this file and app.py update automatically.
 #
 # Run standalone to (re)train and save the model file:
 #       python model.py
-#
-# The Streamlit app (app.py) imports load_or_train() so it can train
-# automatically on first run if no saved model is present.
 # =============================================================
 
 import os
@@ -23,6 +18,8 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error
 
+import features as ft
+
 DATA_URL = (
     "https://raw.githubusercontent.com/kohjiaxuan/"
     "Predicting-HDB-Price-with-Machine-Learning/master/"
@@ -31,26 +28,27 @@ DATA_URL = (
 
 MODEL_PATH = os.path.join(os.path.dirname(__file__), "house_model.pkl")
 
-NUMERIC_FEATURES = ["floor_area_sqm", "lease_commence_date", "floor_level"]
-CATEGORY_FEATURES = ["flat_type", "town"]
-
 
 def load_data():
-    """Download the live HDB resale dataset and add a numeric floor column."""
+    """Download the live HDB resale dataset and apply the cleaning steps."""
     data = pd.read_csv(DATA_URL)
-    # Turn 'storey_range' (e.g. "10 TO 12") into a number (the lower bound)
-    data["floor_level"] = data["storey_range"].str.split(" ").str[0].astype(float)
+    data = ft.clean_data(data)
     return data
+
+
+def build_X(data):
+    """Turn the chosen features into a numeric table the model can use."""
+    return pd.get_dummies(
+        data[ft.all_cols()], columns=ft.categorical_cols()
+    )
 
 
 def train_model():
     """Train, compare two models, and return the best one as a bundle dict."""
     data = load_data()
 
-    X = pd.get_dummies(
-        data[NUMERIC_FEATURES + CATEGORY_FEATURES], columns=CATEGORY_FEATURES
-    )
-    y = data["resale_price"]
+    X = build_X(data)
+    y = data[ft.TARGET]
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42
@@ -70,14 +68,17 @@ def train_model():
     best_name = min(scores, key=lambda n: scores[n][1])
     best_model, best_mae = scores[best_name]
 
+    # Save the choices available for each dropdown (categorical) feature
+    categories = {col: sorted(data[col].dropna().unique().tolist())
+                  for col in ft.categorical_cols()}
+
     return {
         "model": best_model,
         "columns": list(X.columns),
         "model_name": best_name,
         "mae": best_mae,
         "all_scores": {n: s[1] for n, s in scores.items()},
-        "flat_types": sorted(data["flat_type"].unique().tolist()),
-        "towns": sorted(data["town"].unique().tolist()),
+        "categories": categories,
         "n_rows": len(data),
     }
 
@@ -103,6 +104,7 @@ def load_or_train(path=MODEL_PATH):
 
 if __name__ == "__main__":
     print("Downloading data and training models...")
+    print("Features in use:", ", ".join(ft.all_cols()))
     bundle = train_model()
     for name, mae in bundle["all_scores"].items():
         print(f"  {name:18s} -> on average off by S${mae:,.0f}")

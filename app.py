@@ -1,10 +1,8 @@
 # =============================================================
 # L06 — HDB Resale Price Predictor (deployable Streamlit app)
 #
-# Highlights:
-#   * Auto-trains the model on first run if none is saved (load_or_train).
-#   * Caches the trained model so it loads instantly afterwards.
-#   * Uses the richer feature set (flat type + town) chosen in model.py.
+# The input form is built AUTOMATICALLY from features.py — add a feature
+# there and a matching slider/dropdown appears here with no other changes.
 #
 # Run locally:
 #       pip install -r requirements.txt
@@ -14,6 +12,7 @@
 import pandas as pd
 import streamlit as st
 
+import features as ft
 from model import load_or_train
 
 st.set_page_config(page_title="HDB Resale Price Predictor", page_icon="🏡", layout="centered")
@@ -51,32 +50,31 @@ with st.expander("📊 How accurate is this model?", expanded=False):
         )
     )
 
-# ---- Inputs (sidebar) ----
+# ---- Inputs (built automatically from features.py) ----
 st.sidebar.header("Flat details")
-sqm = st.sidebar.slider("Floor area (sqm)", 30, 160, 90, 1)
-lease_year = st.sidebar.slider("Lease commencement year", 1970, 2025, 2000, 1)
-floor = st.sidebar.slider("Floor level (storey)", 1, 50, 5, 1)
-flat_type = st.sidebar.selectbox("Flat type", bundle["flat_types"],
-                                 index=min(2, len(bundle["flat_types"]) - 1))
-town = st.sidebar.selectbox("Town", bundle["towns"])
+user_input = {}
+for f in ft.FEATURES:
+    col, label = f["col"], f["label"]
+    if f["type"] == "numeric":
+        user_input[col] = st.sidebar.slider(
+            label, f["min"], f["max"], f["default"], f["step"]
+        )
+    else:  # categorical -> dropdown using the choices seen during training
+        choices = bundle["categories"].get(col, [])
+        user_input[col] = st.sidebar.selectbox(label, choices)
 
+# ---- Show the chosen flat ----
 st.write("### Your flat")
-c1, c2, c3 = st.columns(3)
-c1.write(f"**Type:** {flat_type}")
-c2.write(f"**Town:** {town}")
-c3.write(f"**Size:** {sqm} sqm")
+cols = st.columns(min(3, len(user_input)))
+for i, (col, val) in enumerate(user_input.items()):
+    label = next(f["label"] for f in ft.FEATURES if f["col"] == col)
+    cols[i % len(cols)].write(f"**{label}:** {val}")
 
 # ---- Prediction ----
 if st.button("Predict resale price", type="primary"):
-    row = pd.DataFrame([{
-        "floor_area_sqm": sqm,
-        "lease_commence_date": lease_year,
-        "floor_level": floor,
-        "flat_type": flat_type,
-        "town": town,
-    }])
-    # Match the exact columns the model was trained on
-    row = pd.get_dummies(row, columns=["flat_type", "town"])
+    row = pd.DataFrame([user_input])
+    # Encode categories and line the columns up exactly with the trained model
+    row = pd.get_dummies(row, columns=ft.categorical_cols())
     row = row.reindex(columns=model_columns, fill_value=0)
 
     price = model.predict(row)[0]

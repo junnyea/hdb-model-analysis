@@ -1,6 +1,6 @@
 # HDB Resale Price Predictor — L06 (Better & Trustworthy Models)
 
-A coaching project that upgrades a simple 3-feature HDB price model into a more
+A teaching project that upgrades a simple 3-feature HDB price model into a more
 accurate, honestly-evaluated one — and deploys it as a Streamlit web app.
 
 Built as a 2-hour coaching add-on for **Module 3 · Machine Learning & GenAI**,
@@ -27,8 +27,24 @@ python model.py
 - Reports its own accuracy (MAE — average dollar error) tested on unseen flats.
 - Compares Linear Regression vs Random Forest and deploys the better one.
 
+## ➕ Adding your own features (do it in ONE place)
+The features the model uses are defined once in **`features.py`**. Both training
+(`model.py`) and the web form (`app.py`) read from it, so they can never disagree.
+
+To add a feature:
+1. **If the column already exists** in the dataset (e.g. `flat_model`), add one
+   entry to the `FEATURES` list in `features.py`.
+2. **If it must be computed** from a raw column (e.g. remaining lease in years),
+   add one line to `clean_data()` in `features.py`, then add its `FEATURES` entry.
+   (A worked example is included, commented out.)
+3. Retrain and redeploy: delete `house_model.pkl`, run `python model.py`, then
+   `streamlit run app.py`. A matching slider/dropdown appears automatically.
+
+That's the whole change — no edits to `model.py` or `app.py` needed.
+
 ## 📂 Repository contents
 ```
+features.py                   ⭐ Single source of truth for the model's features
 app.py                        Streamlit web app (auto-trains on first run)
 model.py                      Training + load_or_train logic (run standalone too)
 requirements.txt              Python dependencies
