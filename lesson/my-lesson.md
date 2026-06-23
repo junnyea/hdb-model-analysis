@@ -143,3 +143,44 @@ But the **overfitting gap** (train R² − test R²) tells the real story:
 error here, but Gradient Boosting barely overfits, so it's more trustworthy as
 data drifts. Always judge by the **test** score *and* the train↔test gap. See the
 "Part C: RF vs Boosting" tab in the webapp.
+
+---
+
+## Case study — stacking: does a *team* of models win? (Part D vs Part D+)
+
+**Stacking** trains several base models side by side, then a small "manager"
+model learns how to blend their predictions. Same 8-feature set, test scores:
+
+| Model | TEST MAE | TEST MAPE | TEST R² |
+|---|---|---|---|
+| Tuned Gradient Boosting (best single) | S$26,439 | 5.1% | 0.964 |
+| Stack — Part D (RF + default GB → Linear) | S$25,732 | 4.9% | 0.962 |
+| **Stack+ — Part D+ (RF + tuned HGB + Ridge → Ridge, passthrough)** | **S$24,630** | **4.7%** | **0.967** |
+
+**Why the enhanced stack wins:** the Part D team barely helped because both bases
+were trees and the GB was untuned — too *similar*. Stacking rewards **diversity**.
+Adding a tuned booster *and* a non-tree learner (`RidgeCV`), plus a regularised
+manager that also sees the raw features (`passthrough=True`), finally beats every
+single model — it's the best result in the whole lab.
+
+**Lesson:** stacking *can* beat the best single model, but only when the team is
+well-designed (strong + diverse bases, regularised manager). The gain here is real
+yet modest (~S$1,800 lower MAE) for ~3× the training cost — so reach for it only
+when that last sliver of accuracy pays off. A single tuned Gradient Boosting gives
+~95% of the benefit far more cheaply. See the "Part D: Stacking" tab in the webapp.
+
+---
+
+## The leverage ladder (the whole lab in one view)
+
+| Step | Change | MAE | R² |
+|---|---|---|---|
+| Baseline | 3 features, Linear | S$102k | ~0.50 |
+| Part B | +flat_type, town | S$82.8k | 0.704 |
+| Part B+ | +3 engineered features | S$52.9k | 0.868 |
+| Part C | Random Forest | S$25.8k | 0.962 |
+| Part C+ tuned | Tuned Gradient Boosting | S$26.4k | 0.964 |
+| **Part D+** | **Enhanced stacking** | **S$24.6k** | **0.967** |
+
+Biggest leverage = **features** (S$102k → S$53k), then a **tuned model**
+(S$53k → S$26k), then a **well-designed ensemble** for the final sliver.

@@ -1,9 +1,7 @@
 # =============================================================
 # L06 — Better, Trustworthy HDB Price Model
-# Training logic (shared by the Streamlit app and command line).
-#
-# The feature list lives in features.py — change it there once and BOTH
-# this file and app.py update automatically.
+# Trains ONE model per selectable profile (Old / Enhanced B / C / D),
+# defined in features.py, and bundles them together for the app.
 #
 # Run standalone to (re)train and save the model file:
 #       python model.py
@@ -13,10 +11,18 @@ import os
 import pickle
 
 import pandas as pd
-from sklearn.linear_model import LinearRegression
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LinearRegression, RidgeCV
+from sklearn.ensemble import (
+    RandomForestRegressor,
+    HistGradientBoostingRegressor,
+    StackingRegressor,
+)
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import (
+    mean_absolute_error,
+    mean_absolute_percentage_error,
+    r2_score,
+)
 
 import features as ft
 
@@ -36,50 +42,76 @@ def load_data():
     return data
 
 
-def build_X(data):
-    """Turn the chosen features into a numeric table the model can use."""
-    return pd.get_dummies(
-        data[ft.all_cols()], columns=ft.categorical_cols()
-    )
+def make_estimator(kind):
+    """Map a profile's estimator key to a fresh scikit-learn model."""
+    if kind == "linear":
+        return LinearRegression()
+    if kind == "hist_gb_tuned":
+        return HistGradientBoostingRegressor(
+            max_iter=500, learning_rate=0.1, max_depth=8,
+            l2_regularization=1.0, random_state=42,
+        )
+    if kind == "stack":
+        return StackingRegressor(
+            estimators=[
+                ("random_forest", RandomForestRegressor(
+                    n_estimators=150, random_state=42, n_jobs=-1)),
+                ("hist_gb_tuned", HistGradientBoostingRegressor(
+                    max_iter=500, learning_rate=0.1, max_depth=8,
+                    l2_regularization=1.0, random_state=42)),
+                ("ridge", RidgeCV()),
+            ],
+            final_estimator=RidgeCV(),
+            passthrough=True, cv=3, n_jobs=-1,
+        )
+    raise ValueError(f"Unknown estimator kind: {kind}")
 
 
-def train_model():
-    """Train, compare two models, and return the best one as a bundle dict."""
-    data = load_data()
+def train_profile(data, key):
+    """Train one profile's model and return its bundle dict."""
+    profile = ft.PROFILES[key]
+    cat_cols = ft.categorical_cols(key)
 
-    X = build_X(data)
+    X = pd.get_dummies(data[profile["cols"]], columns=cat_cols)
     y = data[ft.TARGET]
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42
     )
 
-    candidates = {
-        "Linear Regression": LinearRegression(),
-        "Random Forest": RandomForestRegressor(n_estimators=100, random_state=42),
-    }
-
-    scores = {}
-    for name, model in candidates.items():
-        model.fit(X_train, y_train)
-        mae = mean_absolute_error(y_test, model.predict(X_test))
-        scores[name] = (model, mae)
-
-    best_name = min(scores, key=lambda n: scores[n][1])
-    best_model, best_mae = scores[best_name]
-
-    # Save the choices available for each dropdown (categorical) feature
-    categories = {col: sorted(data[col].dropna().unique().tolist())
-                  for col in ft.categorical_cols()}
+    model = make_estimator(profile["estimator"])
+    model.fit(X_train, y_train)
+    preds = model.predict(X_test)
 
     return {
-        "model": best_model,
+        "model": model,
         "columns": list(X.columns),
-        "model_name": best_name,
-        "mae": best_mae,
-        "all_scores": {n: s[1] for n, s in scores.items()},
+        "label": profile["label"],
+        "short": profile["short"],
+        "desc": profile["desc"],
+        "mae": mean_absolute_error(y_test, preds),
+        "mape": mean_absolute_percentage_error(y_test, preds),
+        "r2": r2_score(y_test, preds),
+    }
+
+
+def train_all():
+    """Train every profile and return one combined bundle."""
+    data = load_data()
+
+    profiles = {key: train_profile(data, key) for key in ft.PROFILES}
+
+    # Dropdown choices for every categorical column (shared across profiles)
+    categories = {
+        col: sorted(data[col].dropna().unique().tolist())
+        for col in ft.all_categorical_cols()
+    }
+
+    return {
+        "profiles": profiles,
         "categories": categories,
         "n_rows": len(data),
+        "default_profile": ft.DEFAULT_PROFILE,
     }
 
 
@@ -89,25 +121,26 @@ def save_model(bundle, path=MODEL_PATH):
 
 
 def load_or_train(path=MODEL_PATH):
-    """Load a saved model, or train and save one if none exists yet.
-
-    This is what makes the app 'deployable when trained': the first time
-    the app runs on a fresh server it trains the model, then reuses it.
-    """
+    """Load the saved bundle, or train and save one if none exists yet."""
     if os.path.exists(path):
         with open(path, "rb") as f:
-            return pickle.load(f)
-    bundle = train_model()
+            bundle = pickle.load(f)
+        # Re-train if an old single-model pickle is found (schema changed)
+        if "profiles" in bundle:
+            return bundle
+    bundle = train_all()
     save_model(bundle, path)
     return bundle
 
 
 if __name__ == "__main__":
-    print("Downloading data and training models...")
-    print("Features in use:", ", ".join(ft.all_cols()))
-    bundle = train_model()
-    for name, mae in bundle["all_scores"].items():
-        print(f"  {name:18s} -> on average off by S${mae:,.0f}")
-    print(f"\nWinner: {bundle['model_name']} (lowest dollar error)")
+    print("Downloading data and training all model profiles...")
+    bundle = train_all()
+    print(f"\nTrained on {bundle['n_rows']:,} rows.\n")
+    header = f"{'Profile':14s} {'MAE':>12s} {'MAPE':>7s} {'R2':>7s}"
+    print(header)
+    print("-" * len(header))
+    for key, p in bundle["profiles"].items():
+        print(f"{p['short']:14s} S${p['mae']:>10,.0f} {p['mape']:>6.1%} {p['r2']:>7.3f}")
     save_model(bundle)
-    print(f"Saved model to {MODEL_PATH}")
+    print(f"\nSaved model bundle to {MODEL_PATH}")

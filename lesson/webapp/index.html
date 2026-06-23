@@ -79,6 +79,7 @@
   <div class="tab active" data-tab="metrics">📐 Metrics Playground</div>
   <div class="tab" data-tab="partb">🏠 Part B vs Enhanced</div>
   <div class="tab" data-tab="partc">🌲 Part C: RF vs Boosting</div>
+  <div class="tab" data-tab="partd">🤝 Part D: Stacking</div>
   <div class="tab" data-tab="lessons">📚 Lessons Learned</div>
 </div>
 
@@ -287,6 +288,65 @@ X_plus = pd.get_dummies(data[numeric_plus + category_plus], columns=category_plu
   </div>
 </main>
 
+<main id="partd" class="panel">
+  <div class="card">
+    <h2>🤝 Stacking — can a <i>team</i> of models beat the best single one?</h2>
+    <p><b>Stacking</b> trains several base models side by side, then a small "manager" model learns
+       how to <b>blend</b> their predictions. The idea: each model makes different mistakes, so a
+       smart blend can beat any one of them.</p>
+    <p>Part D tried it with a naïve team (Random Forest + a <i>default</i> Gradient Boosting) and it
+       barely helped. Part D+ rebuilds the team to be <b>stronger and more diverse</b>.</p>
+    <table>
+      <tr><th>Team</th><th>Base models</th><th>Manager</th></tr>
+      <tr><td><b>Part D</b></td><td class="mono">RandomForest + default GradientBoosting</td><td>LinearRegression</td></tr>
+      <tr><td><b>Part D+</b></td><td class="mono">RandomForest + <b>tuned</b> HistGB + <b>Ridge</b></td><td>RidgeCV + passthrough</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>The scoreboard <span class="hint">(real measured numbers, test set)</span></h2>
+    <table>
+      <tr><th>Model</th><th>MAE</th><th>MAPE</th><th>R²</th></tr>
+      <tr><td>Tuned Gradient Boosting (best single)</td><td>S$26,439</td><td>5.1%</td><td>0.964</td></tr>
+      <tr><td>Stack — Part D (RF + default GB)</td><td>S$25,732</td><td>4.9%</td><td>0.962</td></tr>
+      <tr><td class="winner"><b>Stack+ — Part D+ 🏆</b></td><td class="winner">S$24,630</td><td class="winner">4.7%</td><td class="winner">0.967</td></tr>
+    </table>
+    <div class="bar-wrap" style="margin-top:1.1rem">
+      <p class="bar-lab">Test MAE — shorter is better (S$)</p>
+      <div class="bar-row"><span class="bar-lab">Stack+ (D+)</span>
+        <div class="bar-track"><div class="bar-fill bar-e" style="width:93.1%">S$24,630</div></div></div>
+      <div class="bar-row"><span class="bar-lab">Stack (D)</span>
+        <div class="bar-track"><div class="bar-fill bar-b" style="width:97.3%">S$25,732</div></div></div>
+      <div class="bar-row"><span class="bar-lab">Tuned GB</span>
+        <div class="bar-track"><div class="bar-fill bar-b" style="width:100%">S$26,439</div></div></div>
+    </div>
+    <p class="hint">Part D+ wins on all three metrics — the best result in the whole lab.</p>
+  </div>
+
+  <div class="card">
+    <h2>Why did the enhanced team win when Part D didn't?</h2>
+    <ul>
+      <li><b>Diversity</b> — Part D blended two <i>tree</i> models that make similar mistakes. Part D+ adds
+          <code>RidgeCV</code>, a linear learner that errs <i>differently</i> — the engine of stacking.</li>
+      <li><b>Stronger bases</b> — swapping the default booster for our <b>tuned</b> HistGB raises the team's ceiling.</li>
+      <li><b>passthrough=True</b> — the manager sees the original features <i>and</i> the base predictions, so it can correct them with context.</li>
+      <li><b>Regularised manager</b> — <code>RidgeCV</code> resists overfitting the blend itself.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>✅ Evaluation &amp; conclusion</h2>
+    <table>
+      <tr><th>Rank</th><th>Model</th><th>MAE</th><th>R²</th><th>Note</th></tr>
+      <tr><td>🥇 1</td><td class="winner">Stack+ (enhanced)</td><td>S$24,630</td><td>0.967</td><td>Best on all 3 metrics — but ~3× training cost.</td></tr>
+      <tr><td>🥈 2</td><td>Tuned Gradient Boosting</td><td>S$26,439</td><td>0.964</td><td>Single model; within a whisker for far less complexity.</td></tr>
+      <tr><td>🥉 3</td><td>Stack — Part D</td><td>S$25,732</td><td>0.962</td><td>Naïve team — diversity too low to help.</td></tr>
+    </table>
+    <p class="takeaway" style="margin-top:1rem"><b>Conclusion:</b> stacking <i>can</i> beat the best single model — but only when the team is <b>well-designed</b> (strong, diverse bases + a regularised manager). The gain is real yet modest (~S$1,800 lower MAE) for roughly <b>triple</b> the training time. Reach for enhanced stacking only when that last sliver of accuracy genuinely pays off; otherwise a single <b>tuned Gradient Boosting</b> delivers ~95% of the benefit far more cheaply.</p>
+    <p class="hint">Full code: <span class="mono">6m-data-C3.2/notebooks/C32_practice.ipynb</span> → Part D+</p>
+  </div>
+</main>
+
 <main id="lessons" class="panel">
   <div class="card">
     <h2>📚 The full journey — what each change taught us</h2>
@@ -345,7 +405,16 @@ X_plus = pd.get_dummies(data[numeric_plus + category_plus], columns=category_plu
         <h3>Part C+ tuned — Gradient Boosting 🏆</h3>
         <p><code>max_iter=500, learning_rate=0.1, max_depth=8, l2_regularization=1.0</code></p>
         <span class="pill">Test MAE S$26.4k · R² 0.964 · gap +0.002 ✅</span>
-        <div class="takeaway">📝 <b>The model to ship.</b> Highest test R², MAE tied with Random Forest, and it barely overfits. Tuning bought accuracy <i>and</i> honesty.</div>
+        <div class="takeaway">📝 Highest test R², MAE tied with Random Forest, and it barely overfits. Tuning bought accuracy <i>and</i> honesty.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">7</div>
+      <div class="body">
+        <h3>Part D+ — enhanced stacking 🏆</h3>
+        <p>A diverse team: Random Forest + tuned HistGB + Ridge, blended by a <code>RidgeCV</code> manager with <code>passthrough=True</code>.</p>
+        <span class="pill">Test MAE S$24.6k · MAPE 4.7% · R² 0.967</span>
+        <div class="takeaway">📝 <b>Best result in the lab.</b> A well-designed team finally beats the best single model — but only thanks to <i>diversity</i>; the naïve Part D team didn't help. Real gain, modest size, ~3× the cost.</div>
       </div>
     </div>
   </div>
@@ -358,7 +427,24 @@ X_plus = pd.get_dummies(data[numeric_plus + category_plus], columns=category_plu
       <li><b>Clean your raw columns</b> — turning <code>"61 years 04 months"</code> into a number unlocked the biggest jump.</li>
       <li><b>Watch the overfitting gap</b> — a low test error with a huge train↔test gap is a warning, not a win.</li>
       <li><b>"Best" = low error <i>and</i> small gap</b> — tuning let Gradient Boosting win on both.</li>
+      <li><b>Ensembles need diversity</b> — stacking only beat the best single model when the team mixed <i>different</i> learners (trees + linear); and even then the gain was modest for ~3× the cost.</li>
     </ol>
+  </div>
+
+  <div class="card">
+    <h2>🚀 Try it live — the Streamlit app</h2>
+    <p>The deployable app (<span class="mono">app.py</span>) now lets you <b>switch between all four models</b>
+       from a sidebar and predict the price of any flat you describe — so you can feel these differences yourself.</p>
+    <table>
+      <tr><th>Sidebar choice</th><th>Features</th><th>Model</th><th>Test MAE</th></tr>
+      <tr><td>🅾️ Old model</td><td>3</td><td>Linear Regression</td><td>~S$102k</td></tr>
+      <tr><td>🅱️ Enhanced B</td><td>5</td><td>Linear Regression</td><td>S$82.8k</td></tr>
+      <tr><td>🅲 Enhanced C</td><td>8</td><td>Tuned Gradient Boosting</td><td>S$26.4k</td></tr>
+      <tr><td class="winner">🅳 Enhanced D 🏆</td><td>8</td><td>Stacking ensemble</td><td class="winner">S$24.6k</td></tr>
+    </table>
+    <p class="takeaway" style="margin-top:1rem">Pick a flat, switch models, and watch the estimate — and its error band — tighten as you climb the ladder from Old → Enhanced D. The input form rebuilds itself to match each model's features.</p>
+    <div class="formula mono">pip install -r requirements.txt<br>streamlit run app.py</div>
+    <p class="hint">First launch trains all four models (~1–2 min), then caches them.</p>
   </div>
 </main>
 
