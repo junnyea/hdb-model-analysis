@@ -98,8 +98,8 @@ PROFILES = {
         "short": "Enhanced D",
         "cols": _ENHANCED_FEATURES,
         "estimator": "stack",
-        "desc": "A diverse team — Random Forest + tuned HistGB + Ridge, blended by a "
-                "RidgeCV manager. The best scores in the lab (at ~3x the cost).",
+        "desc": "A diverse team — Random Forest + tuned HistGB — blended by a Linear "
+                "Regression manager. Top-tier scores (at ~3x the training cost).",
     },
 }
 

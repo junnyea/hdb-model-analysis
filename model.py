@@ -34,35 +34,49 @@ DATA_URL = (
 
 MODEL_PATH = os.path.join(os.path.dirname(__file__), "house_model.pkl")
 
+# Cap training rows so the app stays within cloud (free-tier) memory limits.
+# The full dataset (~233k rows) peaks well above 2 GB when training the
+# ensemble; a sample trains fast, fits in memory, and the metrics barely move.
+# Set the env var HDB_MAX_ROWS=0 to train on the full dataset locally.
+MAX_TRAIN_ROWS = int(os.environ.get("HDB_MAX_ROWS", "60000"))
+
 
 def load_data():
-    """Download the live HDB resale dataset and apply the cleaning steps."""
+    """Download the live HDB resale dataset, clean it, and (optionally) sample."""
     data = pd.read_csv(DATA_URL)
     data = ft.clean_data(data)
+    if MAX_TRAIN_ROWS and len(data) > MAX_TRAIN_ROWS:
+        data = data.sample(MAX_TRAIN_ROWS, random_state=42).reset_index(drop=True)
     return data
 
 
 def make_estimator(kind):
-    """Map a profile's estimator key to a fresh scikit-learn model."""
+    """Map a profile's estimator key to a fresh scikit-learn model.
+
+    Kept deliberately lightweight and numerically stable so the app trains
+    reliably on a small cloud instance. n_jobs=1 avoids parallel memory copies.
+    """
     if kind == "linear":
         return LinearRegression()
     if kind == "hist_gb_tuned":
         return HistGradientBoostingRegressor(
-            max_iter=500, learning_rate=0.1, max_depth=8,
+            max_iter=400, learning_rate=0.1, max_depth=8,
             l2_regularization=1.0, random_state=42,
         )
     if kind == "stack":
+        # Stable Part D design: two diverse tree models blended by a simple,
+        # well-conditioned Linear Regression "manager". (A RidgeCV manager
+        # proved numerically unstable on this one-hot encoded data.)
         return StackingRegressor(
             estimators=[
                 ("random_forest", RandomForestRegressor(
-                    n_estimators=150, random_state=42, n_jobs=-1)),
+                    n_estimators=100, random_state=42, n_jobs=1)),
                 ("hist_gb_tuned", HistGradientBoostingRegressor(
-                    max_iter=500, learning_rate=0.1, max_depth=8,
+                    max_iter=400, learning_rate=0.1, max_depth=8,
                     l2_regularization=1.0, random_state=42)),
-                ("ridge", RidgeCV()),
             ],
-            final_estimator=RidgeCV(),
-            passthrough=True, cv=3, n_jobs=-1,
+            final_estimator=LinearRegression(),
+            cv=3, n_jobs=1,
         )
     raise ValueError(f"Unknown estimator kind: {kind}")
 
@@ -99,7 +113,14 @@ def train_all():
     """Train every profile and return one combined bundle."""
     data = load_data()
 
-    profiles = {key: train_profile(data, key) for key in ft.PROFILES}
+    profiles = {}
+    for key in ft.PROFILES:
+        try:
+            profiles[key] = train_profile(data, key)
+        except Exception as exc:  # one bad model shouldn't break the whole app
+            print(f"  WARNING: profile '{key}' failed to train: {exc}")
+    if not profiles:
+        raise RuntimeError("No model profiles trained successfully.")
 
     # Dropdown choices for every categorical column (shared across profiles)
     categories = {

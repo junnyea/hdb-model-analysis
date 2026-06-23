@@ -39,6 +39,8 @@ st.caption(
 # ---- Model profile selector ----
 keys = list(profiles.keys())
 default_key = bundle.get("default_profile", keys[0])
+if default_key not in keys:  # the default profile may have failed to train
+    default_key = keys[0]
 choice = st.sidebar.radio(
     "Model",
     keys,
