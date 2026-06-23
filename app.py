@@ -113,4 +113,43 @@ if st.button("Predict resale price", type="primary"):
     )
 
 st.divider()
+
+# ---- Overall learning (the story behind the four models) ----
+with st.expander("📚 What this app teaches — the full journey & key lessons", expanded=False):
+    st.markdown(
+        "**The leverage ladder** — how the average error shrank, step by step "
+        "(all on unseen test data):"
+    )
+    st.table(
+        pd.DataFrame([
+            {"Step": "Baseline (3 features, Linear)", "MAE": "S$102,000", "R²": "~0.50"},
+            {"Step": "Enhanced B (+flat_type, town)", "MAE": "S$82,761", "R²": "0.704"},
+            {"Step": "Part B+ (+lease, txn_year, model)", "MAE": "S$52,882", "R²": "0.868"},
+            {"Step": "Enhanced C (tuned Gradient Boosting)", "MAE": "S$26,439", "R²": "0.964"},
+            {"Step": "Enhanced D (stacking ensemble)", "MAE": "S$24,630", "R²": "0.967"},
+        ])
+    )
+    st.markdown(
+        """
+**🧭 Thinking like a data scientist — five lessons:**
+
+1. **Spend effort where the leverage is.** ~Half the total gain came from *features
+   and data cleaning* (S$102k → S$53k); ensembling added only ~6% for ~3× the cost.
+   Interrogate the **data** before reaching for fancier models.
+2. **A single metric is a trap.** Triangulate **MAE** (dollar intuition) + **MAPE**
+   (scale-fair) + **R²** (vs. a mean-guess), and pair the *test* score with the
+   *train↔test gap* — Random Forest's lowest MAE hid heavy overfitting.
+3. **"Best" is a business decision.** Stacking won on accuracy but costs ~3× and is
+   harder to serve & maintain. Choose on the **Pareto frontier of accuracy vs.
+   cost / complexity / risk** — often the tuned single model wins.
+4. **Trust comes from honest evaluation.** Score on held-out data and show an
+   uncertainty band (±MAE), not a false-precision point estimate.
+5. **Know when to stop.** When the curve flattens, ROI shifts to *better data*,
+   *drift monitoring*, and *validating business impact* — not more modelling.
+
+> **A data scientist's job isn't to maximise a metric — it's to make a
+> trustworthy, cost-aware decision under uncertainty.**
+"""
+    )
+
 st.caption("Module 3 · Machine Learning & GenAI · L06 coaching project")

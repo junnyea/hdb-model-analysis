@@ -184,3 +184,27 @@ when that last sliver of accuracy pays off. A single tuned Gradient Boosting giv
 
 Biggest leverage = **features** (S$102k → S$53k), then a **tuned model**
 (S$53k → S$26k), then a **well-designed ensemble** for the final sliver.
+
+---
+
+## 🧭 Overall conclusion — thinking like a data scientist
+
+The numbers say *what* happened; this is *how to reason* about them.
+
+1. **Spend effort where the leverage is.** ~Half the total gain came from features
+   and data cleaning (S$102k → S$53k), a fraction came from ensembling (S$26k →
+   S$24.6k, ~6% for ~3× the cost). Diminishing returns — interrogate the *data*
+   before reaching for fancier models.
+2. **A single metric is a trap.** Triangulate MAE (dollar intuition) + MAPE (scale-
+   fair) + R² (vs. mean), and always pair the *test* score with the *train↔test gap*
+   (bias–variance). Random Forest's lowest MAE hid heavy overfitting.
+3. **"Best" is a business decision.** Stacking won on accuracy but costs ~3× and is
+   harder to serve/maintain. Pick on the **Pareto frontier of accuracy vs. cost /
+   complexity / risk** — often the tuned single model wins.
+4. **Trust comes from honest evaluation.** Score on held-out data; show an uncertainty
+   band (±MAE), not false-precision points.
+5. **Know when to stop.** When the curve flattens, the ROI shifts to *better data*,
+   *drift monitoring*, and *validating business impact* — not more modelling.
+
+> **A data scientist's job isn't to maximise a metric — it's to make a trustworthy,
+> cost-aware decision under uncertainty.**

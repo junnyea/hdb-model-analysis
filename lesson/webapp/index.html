@@ -81,6 +81,7 @@
   <div class="tab" data-tab="partc">🌲 Part C: RF vs Boosting</div>
   <div class="tab" data-tab="partd">🤝 Part D: Stacking</div>
   <div class="tab" data-tab="lessons">📚 Lessons Learned</div>
+  <div class="tab" data-tab="conclusion">🧭 Overall Conclusion</div>
 </div>
 
 <main id="metrics" class="panel active">
@@ -445,6 +446,56 @@ X_plus = pd.get_dummies(data[numeric_plus + category_plus], columns=category_plu
     <p class="takeaway" style="margin-top:1rem">Pick a flat, switch models, and watch the estimate — and its error band — tighten as you climb the ladder from Old → Enhanced D. The input form rebuilds itself to match each model's features.</p>
     <div class="formula mono">pip install -r requirements.txt<br>streamlit run app.py</div>
     <p class="hint">First launch trains all four models (~1–2 min), then caches them.</p>
+  </div>
+</main>
+
+<main id="conclusion" class="panel">
+  <div class="card">
+    <h2>🧭 Overall conclusion — thinking like a data scientist</h2>
+    <p>The numbers tell <i>what</i> happened. This is <i>how a practitioner reasons</i> about them — five lenses an ML specialist applies to a project like this.</p>
+  </div>
+
+  <div class="card">
+    <h2>1 · Spend effort where the leverage is</h2>
+    <p>Error fell <b>S$102k → S$24.6k</b> — but where did the gains come from?</p>
+    <table>
+      <tr><th>Lever</th><th>Drop</th><th>Effort</th></tr>
+      <tr><td>Features (B, B+)</td><td class="winner">S$102k → S$53k (~half the total)</td><td>Hours of data cleaning</td></tr>
+      <tr><td>Model + tuning (C, C+)</td><td>S$53k → S$26k</td><td>Minutes of code, more compute</td></tr>
+      <tr><td>Ensembling (D, D+)</td><td>S$26k → S$24.6k (~6%)</td><td>~3× compute, more complexity</td></tr>
+    </table>
+    <p class="takeaway" style="margin-top:.8rem">Classic <b>diminishing returns</b>. Juniors reach for fancier models first; seniors interrogate the <i>data</i> first — that's where the cheap, large wins live. A messy text column (<code>remaining_lease</code>) cleaned into a number beat every algorithm swap.</p>
+  </div>
+
+  <div class="card">
+    <h2>2 · A single metric is a trap — triangulate</h2>
+    <p>We never judged on one number: <b>MAE</b> gives a dollar-intuition stakeholders feel, <b>MAPE</b> normalises across cheap and pricey flats, <b>R²</b> sanity-checks against a naïve mean-guess. And we paired the <b>test</b> score with the <b>train↔test gap</b> — the bias–variance lens. Random Forest's lowest MAE <i>hid</i> heavy overfitting (train R² 0.994 vs test 0.962). The best model on one axis can be wrong once you add the second: <b>generalisation</b>.</p>
+  </div>
+
+  <div class="card">
+    <h2>3 · "Best" is a business decision, not a leaderboard</h2>
+    <p>Enhanced stacking won every accuracy metric — yet isn't automatically the right ship:</p>
+    <ul>
+      <li><b>Latency / cost</b> — ~3× training time and a heavier artifact for a ~6% MAE gain.</li>
+      <li><b>Maintainability</b> — three base models + a manager is more to monitor, debug and re-train.</li>
+      <li><b>Marginal value</b> — is S$1,800 less average error worth that to <i>this</i> business? For a pricing guide, probably not; for a fund trading on it, maybe.</li>
+    </ul>
+    <p class="takeaway">A senior picks the model on the <b>Pareto frontier of accuracy vs. cost / complexity / risk</b> — here, the tuned single Gradient Boosting is often the pragmatic winner.</p>
+  </div>
+
+  <div class="card">
+    <h2>4 · Trust comes from honest evaluation, not high scores</h2>
+    <p>Every score is on <b>held-out</b> data the model never saw — the only honest estimate of real-world performance. The app's <b>±MAE error band</b> communicates <i>uncertainty</i> instead of false-precision. That's the difference between a model that looks good in a notebook and one a business can rely on.</p>
+  </div>
+
+  <div class="card">
+    <h2>5 · Know when to stop</h2>
+    <p>The curve flattened at Part D. Chasing fractions of a percent with exotic models is low-ROI. The real next moves aren't more modelling — they're <b>better data</b> (renovation, distance-to-MRT, amenities), <b>monitoring for drift</b> (prices move with policy &amp; rates — <code>txn_year</code> already mattered), and <b>validating business impact</b>. Modelling is one loop in a larger system.</p>
+  </div>
+
+  <div class="card">
+    <h2>🎯 The mindset in one line</h2>
+    <p class="takeaway" style="border-left-color:var(--accent);font-size:1rem"><b>A data scientist's job isn't to maximise a metric — it's to make a trustworthy, cost-aware decision under uncertainty.</b> Get the data right, measure honestly on unseen data, judge accuracy <i>and</i> generalisation <i>and</i> cost together, and stop when the marginal gain no longer pays for its complexity.</p>
   </div>
 </main>
 
