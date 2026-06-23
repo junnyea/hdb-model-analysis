@@ -38,7 +38,7 @@ MODEL_PATH = os.path.join(os.path.dirname(__file__), "house_model.pkl")
 # The full dataset (~233k rows) peaks well above 2 GB when training the
 # ensemble; a sample trains fast, fits in memory, and the metrics barely move.
 # Set the env var HDB_MAX_ROWS=0 to train on the full dataset locally.
-MAX_TRAIN_ROWS = int(os.environ.get("HDB_MAX_ROWS", "60000"))
+MAX_TRAIN_ROWS = int(os.environ.get("HDB_MAX_ROWS", "30000"))
 
 
 def load_data():
